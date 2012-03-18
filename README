@@ -18,6 +18,7 @@ Installation:
 1. Compile and install the patched kernel
     $ git clone git@github.com:ah-/ubuntu-kernel-mbp.git
     $ cd ubuntu-kernel-mbp
+    $ git checkout gmux
     $ fakeroot debian/rules clean
     $ skipabi=true skipmodule=true fakeroot debian/rules binary-indep
     $ skipabi=true skipmodule=true fakeroot debian/rules binary-perarch
