@@ -1,0 +1,113 @@
+GPU switching for 2010 Macbook Pros
+
+This is highly experimental. Expect crashes and lockups. Even though I haven't experienced anything serious, I'm not responsible if it causes your Macbook to explode or worse.
+
+Prerequisites:
+    A running Ubuntu 12.04 system, booting via Bootcamp/BIOS
+    envytools: https://github.com/pathscale/envytools
+    optional: NVIDIA proprietary driver 
+        (install nvidia-current, but keep it blacklisted in /etc/modprobe.d, make sure nouveau is _not_ blacklisted)
+    optional: Bumblebee: https://wiki.ubuntu.com/Bumblebee
+    really useful: Setup ssh and networking so it's automatically available after boot. 
+        Checking "Available to all users" in the configuration dialog should do the trick.
+
+    It's also useful to have a dump of your vbios and to know what PDISPLAY_VGA_ROM_WINDOW should be. Run get_vbios.sh and get_rom_window.sh. The output of get_rom_window.sh should be something like "00619f04: 000ffe09".
+    Make sure there is _no_ /etc/X11/xorg.conf, xorg should start on the right card automatically.
+
+Installation:
+1. Compile and install the patched kernel
+    $ git clone git@github.com:ah-/ubuntu-kernel-mbp.git
+    $ cd ubuntu-kernel-mbp
+    $ fakeroot debian/rules clean
+    $ skipabi=true skipmodule=true fakeroot debian/rules binary-indep
+    $ skipabi=true skipmodule=true fakeroot debian/rules binary-perarch
+    $ skipabi=true skipmodule=true fakeroot debian/rules binary-mbp
+    $ cd ..
+    $ sudo dpkg -i *deb
+    (see also http://blog.avirtualhome.com/2012/01/13/compile-linux-kernel-3-2-for-ubuntu-11-10/, section Compile)
+2. Boot into the new kernel
+3. Compile and install the apple_gmux switching driver
+    $ https://github.com/ah-/gmux
+    $ cd gmux
+    $ make
+    $ sudo cp apple_gmux.ko /lib/modules/3.2.0-18-mbp/kernel/drivers/platform/x86/apple-gmux.ko
+4. Configure Grub
+    see gmux-scripts/conf menuentries
+    If you want output during boot don't forget 
+        set gfxpayload=console (for BIOS)
+    or
+        set gfxpayload=keep
+        insmod (hd1,gpt1)/efi/grub/efi_gop.mod
+        terminal_output gfxterm
+    for EFI.
+    You also need a few boot parameters:
+        i915.lvds_channel=2
+            See http://lists.freedesktop.org/archives/intel-gfx/2012-March/015499.html
+        i915.modeset=1 i915.lvds_use_ssc=0
+        i5s_enable_igd=1
+            Quirk to enable the Intel Integrated Graphics in BIOS mode
+        i5s_3400s_force_ahci=1
+            Quirk to enable AHCI in BIOS mode (not necessary, but useful)
+        drm.debug=0x14 log_buf_len=16M
+            To get a lot of debug output in case anything goes wrong
+        text
+            Boot into text console, not X, just to be safe
+5. Configure bumblebee:
+    Make sure it isn't started automatically on boot
+    Copy the configuration from gmux-scripts/conf/bumblebee to /etc/bumblebee
+
+Usage:
+    Get the current status:
+        $ cat /sys/kernel/debug/vgaswitcheroo/switch
+    After boot the NVIDIA card is active. Switch between both cards with
+        $ echo IGD > /sys/kernel/debug/vgaswitcheroo/switch
+        $ echo DIS > /sys/kernel/debug/vgaswitcheroo/switch
+    You can also tell it to do a delayed switch (wait until X is stopped, then switch)
+        $ echo DIGD > /sys/kernel/debug/vgaswitcheroo/switch
+        $ echo DDIS > /sys/kernel/debug/vgaswitcheroo/switch
+    And power the card not in use on/off:
+        $ echo ON > /sys/kernel/debug/vgaswitcheroo/switch
+        $ echo OFF > /sys/kernel/debug/vgaswitcheroo/switch
+    Start/stop X:
+        $ start lightm
+        $ stop lightm
+    Use the dedicated card on demand with bumblebee (with nouveau):
+        # switch to IGD, start lightdm, log in before
+        $ cd gmux-scripts/bin
+        $ ./bumblebee-nouveau.sh
+        # in another terminal
+        $ optirun glxspheres
+        $ optirun bash
+        # stop ./bumblebee-nouveau.sh with ctrl-c
+    Use the dedicated card on demand with bumblebee (with nvidia blob):
+        See above, replace nouveau with nvidia
+        Don't forget to dump the vbios before and check PDISPLAY_VGA_ROM_WINDOW
+    Start X with nvidia blob:
+        # switch to dedicated card, using nouveau
+        $ echo DIS > /sys/kernel/debug/vgaswitcheroo/switch
+        $ cd gmux-scripts/bin
+        $ ./nvidia_load.sh
+    Stop X after using it with the nvidia blob:
+        # use nohup so the script keeps running even after lightdm is stopped
+        $ nohup ./nvidia_unload.sh &
+        $ stop lightdm
+        # then switch to a text console with ctrl-alt-f1
+
+Known issues:
+    No output when booting:
+        Boot with set gfxpayload=console for text during boot
+    There's no text console when using the nvidia X driver:
+        That isn't specific to graphics switching, go bug Nvidia
+    Instabilities when unloading drivers/suspending while the dedicated card is powered off:
+        Suspend doesn't work reliably yet
+        Power the dedicated card on using echo ON > /sys/kernel/debug/vgaswitcheroo/switch before doing anything with it
+    OpenGL doesn't work:
+        Check update-alternatives --config x86_64-linux-gnu_gl_conf, select mesa for i915/nouveau and nvidia for the nvidia blob
+    nvidia blob: NVRM: RmInitAdapter failed! (0x30:0xffffffff:858) in dmesg
+        VBIOS is inaccessible, it might help to restore it manually:
+        $ ./fix_vbios.sh
+        Unfortunately this doesn't always work. In that case, reboot.
+    Sound issues, e.g. hda-codec: out of range cmd 3:0:5:707:ffffffbf in dmesg:
+        Powering the NVIDIA gpu off also shuts down the audio output on it. This is pretty much ignored at the moment but didn't cause any major issues for me.
+    Artefacts during lightdm/gnome-shell startup when using the nvidia card
+        No idea, but I get the same artefacts without graphics switching

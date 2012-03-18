@@ -1,0 +1,10 @@
+Section "ServerLayout"
+    Identifier     "Layout0"
+#    Option         "AutoAddDevices" "false"
+EndSection
+
+Section "Device"
+    Identifier     "Device0"
+    Driver         "nouveau"
+    Option "ConnectedMonitor" "LVDS"
+EndSection
