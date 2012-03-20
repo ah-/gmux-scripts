@@ -107,7 +107,6 @@ Known issues:
     nvidia blob: NVRM: RmInitAdapter failed! (0x30:0xffffffff:858) in dmesg
         VBIOS is inaccessible, it might help to restore it manually:
         $ ./fix_vbios.sh
-        Unfortunately this doesn't always work. In that case, reboot.
     Sound issues, e.g. hda-codec: out of range cmd 3:0:5:707:ffffffbf in dmesg:
         Powering the NVIDIA gpu off also shuts down the audio output on it. This is pretty much ignored at the moment but didn't cause any major issues for me.
     Artefacts during lightdm/gnome-shell startup when using the nvidia card
