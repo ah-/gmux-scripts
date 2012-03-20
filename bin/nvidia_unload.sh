@@ -8,5 +8,6 @@ while pgrep X; do
 done
 
 rmmod nvidia && \
+./fix_vbios.sh && \
 modprobe nouveau
 

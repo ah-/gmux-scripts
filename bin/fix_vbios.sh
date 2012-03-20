@@ -9,8 +9,8 @@ fi
 
 # TODO: check value first before restoring it
 echo "restoring VBIOS, old value:"
-nvapeek 614f04
-nvapoke 614f04 0xffe09
+nvapeek 619f04
+nvapoke 619f04 0xffe09
 echo "new value:"
-nvapeek 614f04
+nvapeek 619f04
 nvafakebios vbios.bin
